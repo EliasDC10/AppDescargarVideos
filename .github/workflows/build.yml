@@ -1,0 +1,41 @@
+name: Compilar macOS y Windows
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            artifact: DescargadorVideos-macOS
+          - os: windows-2022
+            artifact: DescargadorVideos-Windows
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Instalar dependencias
+        run: python -m pip install -r requirements.txt
+      - name: Preparar yt-dlp y FFmpeg
+        run: python scripts/prepare_build.py
+      - name: Compilar
+        run: pyinstaller --clean --noconfirm UniversalVideoDownloader.spec
+      - name: Comprimir macOS
+        if: runner.os == 'macOS'
+        run: ditto -c -k --sequesterRsrc --keepParent "dist/Descargador de Videos.app" "dist/DescargadorVideos-macOS.zip"
+      - name: Comprimir Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: Compress-Archive -Path "dist/Descargador de Videos/*" -DestinationPath "dist/DescargadorVideos-Windows.zip"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: dist/*.zip
